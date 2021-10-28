@@ -1,4 +1,4 @@
-import numpy as np # linear algebra
+import numpy as np
 import os
 import pandas as pd
 import cv2
@@ -174,5 +174,6 @@ class Data_augmentation:
 if __name__ == "__main__":
     path_in = "../Ressources/data/Fer2013Unfolded"
     path_out = "../Ressources/data/Fer2013Augmented2"
+    Data_augmentation.DataSetAugmentation(path_out,'../Ressources/data/Fer2013')
     Data_augmentation.DataSetToCsv(path_out,'../Ressources/data/Fer2013')
 
