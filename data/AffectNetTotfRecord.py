@@ -6,6 +6,7 @@ from zipfile import ZipFile
 from PIL import Image,ImageOps
 import tqdm
 import glob
+
 #tf.enable_eager_execution()
 import tensorflow.contrib.eager as tfe
 ########################################################################################################################
