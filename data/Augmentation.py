@@ -56,7 +56,7 @@ class Data_augmentation:
         img_rot_45 = self.rotate(img,45)
         img_rot_90_ = self.rotate(img,-90)
         img_rot_45_ = self.rotate(img,-45)
-        img_gaussian = self.noisy("gauss",img)
+        img_gaussian = self.noise("gauss",img)
 
 
         cv2.imwrite(save_path +'/vflip_'+self.name, img_flip_v)
@@ -84,40 +84,7 @@ class Data_augmentation:
             for file in files:
                 raw_image = Data_augmentation(root,file)
                 raw_image.image_augment(output_path+"/"+dir_name+"/")
-    def DataSetToCsv(path,output_path):
-        os.chdir(path)
-        lists = os.listdir(path)
-        emotions = []
-        pixels = []
-        usages=[]
-        Usage_list=['Training','PublicTest']
-        dir_name_sub_root=""
-
-        test_or_train=["test","train"]
-        for root, dirs, files in os.walk(path):
-
-            for i,t in enumerate(test_or_train):
-                if root.find(t)!= -1 :
-                    dir_name_sub_root=test_or_train[i]
-                    usage=Usage_list[i]
-
-            if len(dirs) == 0:
-                dir_name = dir_name_sub_root + "/"+root[-1]
-
-            for file in files:
-                raw_image = np.array(cv2.imread(os.path.join(root, file))).tostring()
-                pixels.append(raw_image)
-                emotions.append(root[-1])
-                usages.append(usage)
-
-
-
-        dictP_n = [(root[-1],raw_image,  usage)]
-
-        data = pd.DataFrame(dictP_n, columns=['emotion','pixels','usage'], index = None)
-        data = data.sample(frac=1)
-        data.to_csv(output_path+"ferAug.csv", index =None)
-    def noisy(self,noise_typ,image):
+    def noise(self,noise_typ,image):
         if noise_typ == "gauss":
             row,col,ch= image.shape
             mean = 0
@@ -134,7 +101,7 @@ class Data_augmentation:
             out = np.copy(image)
             # Salt mode
             num_salt = np.ceil(amount * image.size * s_vs_p)
-            coords = [np.random.randint(0, i - 1, int(num_salt))         for i in image.shape]
+            coords = [np.random.randint(0, i - 1, int(num_salt)) for i in image.shape]
             out[coords] = 1
 
             # Pepper mode
@@ -154,26 +121,9 @@ class Data_augmentation:
             gauss = gauss.reshape(row,col,ch)
             noisy = image + image * gauss
             return noisy
-    def file_to_lists_of_strings(ressource_path,data_file_name,chunck_size=1000):
-        with open(ressource_path+data_file_name, "r") as f:
-            raws=[]
-            line_index=0
-            for line in f:
-                if line_index==0:
-                    line_index+=1
-                else:
-                    col=line[:-1].split(',')
-                    raws.append([str(col[i]) for i in len(col)])
-                    if any([col[i]=='' or col[i]=='NaN' for i in range(len(col))]):
-                        print('problem'+str(line_index))
-                    line_index+=1
-
-            return raws
-
 
 if __name__ == "__main__":
     path_in = "../Ressources/data/Fer2013Unfolded"
     path_out = "../Ressources/data/Fer2013Augmented2"
     Data_augmentation.DataSetAugmentation(path_out,'../Ressources/data/Fer2013')
-    Data_augmentation.DataSetToCsv(path_out,'../Ressources/data/Fer2013')
 

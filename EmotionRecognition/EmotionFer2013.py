@@ -7,7 +7,7 @@ import numpy as np
 
 from tensorflow.keras.utils import to_categorical
 
-from NetworkSeq import NetworkSeq
+from NetworkFer2013 import Network
 ressource_path='../Ressources/data/Fer2013/FerAugmented'
 data_file_name ='/Fer2013Aug.csv'
 
@@ -19,10 +19,7 @@ data_file_name ='/fer2013.csv'
 
 df=pd.read_csv(ressource_path+data_file_name)
 
-# print(df.info())
-# print(df["Usage"].value_counts())
 
-# print(df.head())
 X_train,train_y,X_test,test_y=[],[],[],[]
 
 for index, row in df.iterrows():
@@ -66,6 +63,6 @@ X_train = X_train.reshape(X_train.shape[0], 48, 48, 1)
 X_test = X_test.reshape(X_test.shape[0], 48, 48, 1)
 
 
-model = NetworkSeq(num_labels=num_labels,width=width,height=height,input_shape=X_train.shape[1:])
+model = NetworkFer2013(num_labels=num_labels,width=width,height=height,input_shape=X_train.shape[1:])
 model.creat_graph()
 model.Train(X_Train=X_train,Y_Train=train_y,Test_X=X_test,Test_Y=test_y,batch_size=batch_size,epochs=epochs)

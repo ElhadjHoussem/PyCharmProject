@@ -18,6 +18,7 @@ NUM_CLASSES = len(LABELS)
 
 ZIP_FILE_NAME = "J:/Emotion/AffectNet.zip"
 RECORD_RIR="AffectNetRecords_64x64_gray/"
+
 ANNOTATION_SUFFIX_KEYS=['aro','val','exp']
 ANNOTATION_TYPES={'aro':'float','val' :'float','exp':'int'}
 DATA_DICT_KEYS=['image','expression','arousal','valence']
@@ -156,41 +157,7 @@ def parse_tfr_element(element):
 ''' Read/Write  the TFRecord'''
 ########################################################################################################################
 
-'''writer functions'''
-def write_images_to_tfr_(images, labels, filename:str="_images", max_files:int=10, out_dir:str="content/"):
-
-    #determine the number of shards (single TFRecord files) we need:
-    splits = (len(images)//max_files) + 1 #determine how many tfr shards are needed
-    if len(images)%max_files == 0:
-        splits-=1
-    print(f"\nUsing {splits} shard(s) for {len(images)} files, with up to {max_files} samples per shard")
-
-    file_count = 0
-
-    for i in tqdm.tqdm(range(splits)):
-        current_shard_name = "{}{}_{}{}.tfrecords".format(out_dir, i+1, splits, filename)
-        writer = tf.io.TFRecordWriter(current_shard_name)
-
-        current_shard_count = 0
-        while current_shard_count < max_files: #as long as our shard is not full
-            #get the index of the file that we want to parse now
-            index = i*max_files+current_shard_count
-            if index == len(images): #when we have consumed the whole data, preempt generation
-                break
-            current_image = images[index]
-            current_label = labels[index]
-
-            #create the required Example representation
-            out = parse_single_image(image=current_image, label=current_label)
-
-            writer.write(out.SerializeToString())
-            current_shard_count+=1
-            file_count += 1
-
-        writer.close()
-    print(f"\nWrote {file_count} elements to TFRecord")
-    return file_count
-
+'''writer function'''
 def write_images_to_tfr(tfrecord_filename:str="_AffectNet", chunk_size:int=10, out_dir:str=RECORD_RIR):
 
     total_image = count_annotation(ZIP_FILE_NAME,ANNOTATION_SUFFIX_KEYS)
@@ -224,38 +191,7 @@ def write_images_to_tfr(tfrecord_filename:str="_AffectNet", chunk_size:int=10, o
         writer.close()
     print(f"\nWrote {file_count} elements to TFRecord")
     return file_count
-
-# '''Reader functions'''
-# def get_dataset(batch_size,tfr_dir:str=RECORD_RIR, pattern:str="*_AffectNet.tfrecords"):
-#     files = glob.glob(tfr_dir+pattern, recursive=False)
-#     #create the dataset
-#     dataset = tf.data.TFRecordDataset(files)
-#     #pass every single feature through the mapping function
-#     dataset = dataset.map(
-#         parse_tfr_element,num_parallel_calls=8
-#     )
-#     dataset = dataset.repeat()
-#
-#     # Set the number of datapoints you want to load and shuffle
-#     dataset = dataset.shuffle(batch_size*20)
-#
-#     # Set the batchsize
-#     dataset = dataset.batch(batch_size)
-#
-#     # Create an iterator
-#     iterator = dataset.make_one_shot_iterator()
-#
-#     # Create  the iterator
-#     image, expression,_,_ = iterator.get_next()
-#
-#     # set the picture to NHWC
-#     image = tf.reshape(image, [-1, 64, 64, 1])
-#
-#     # Create a one hot array for your labels
-#     expression = tf.one_hot(expression, NUM_CLASSES)
-#     Train_batch = (image,expression)
-#     return Train_batch
-'''Reader functions'''
+'''Reader function'''
 def get_dataset(batch_size,data_size,tfr_dir:str=RECORD_RIR, pattern:str="*_AffectNet.tfrecords"):
 
     train_size = int(0.7 * data_size)
@@ -284,8 +220,7 @@ def get_dataset(batch_size,data_size,tfr_dir:str=RECORD_RIR, pattern:str="*_Affe
     val_dataset = val_dataset.batch(batch_size)
 
     return train_dataset,val_dataset
-
-def get_dataset__(batch_size,tfr_dir:str=RECORD_RIR, pattern:str="*_AffectNet.tfrecords"):
+def get_dataset_(batch_size,tfr_dir:str=RECORD_RIR, pattern:str="*_AffectNet.tfrecords"):
     file=tf.data.Dataset.list_files(tfr_dir+pattern)
     dataset = tf.data.TFRecordDataset(file)
     dataset = dataset.shuffle(batch_size*50)
@@ -293,36 +228,6 @@ def get_dataset__(batch_size,tfr_dir:str=RECORD_RIR, pattern:str="*_AffectNet.tf
     dataset = dataset.map(parse_tfr_element)
     dataset = dataset.batch(batch_size)
     return dataset
-def get_dataset_(batch_size,tfr_dir:str=RECORD_RIR, pattern:str="*_AffectNet.tfrecords"):
-    files = glob.glob(tfr_dir+pattern, recursive=False)
-    #create the dataset
-    dataset = tf.data.TFRecordDataset(files)
-    #pass every single feature through the mapping function
-    dataset = dataset.map(
-        parse_tfr_element,num_parallel_calls=8
-    )
-    dataset = dataset.repeat()
-
-    # Set the number of datapoints you want to load and shuffle
-    dataset = dataset.shuffle(batch_size*20)
-
-    # Set the batchsize
-    dataset = dataset.batch(batch_size)
-
-    # Create an iterator
-    iterator = dataset.make_one_shot_iterator()
-
-    # Create  the iterator
-    image, expression,_,_ = iterator.get_next()
-
-    # set the picture to NHWC
-    image = tf.reshape(image, [-1, 64, 64, 1])
-
-    # Create a one hot array for your labels
-    expression = tf.one_hot(expression, NUM_CLASSES)
-    Train_batch = (image,expression)
-    return Train_batch
-
 
 ########################################################################################################################
 '''Testing Tf_Recording '''

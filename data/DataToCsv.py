@@ -7,20 +7,15 @@ import csv
 import logging
 import threading
 import time
-import concurrent.futures
 from dask import dataframe as dd
 
 print(os.listdir("../Ressources"))
 
 
-
 def DataSetToCsv(path,output_path):
-    dictP_n = []
-
 
     dataframe = pd.DataFrame(columns=['emotion','pixels','usage'])
     dataframe.to_csv(output_path+"/ferAug.csv", index=False, mode='a',header=True)
-
 
     emotions = []
     pixels = []
@@ -67,7 +62,6 @@ def MergeCsv(path_list,path_csv):
                     count+=1
                     if count%1000==0:
                         print("======Merging %s lines =======", str(count))
-
 def MergeCsv2(path_list,path_csv):
     sep = ";"
     count = 0
@@ -92,13 +86,11 @@ def shuffleCsv(path,fileName):
     dask_df.to_csv(path+"shuffeled_"+fileName)
     end = time.time()
     print("Read csv with dask: ",(end-start),"sec")
-
 def MergeThread_function(index,path,path_to_csv,lock):
     print("Thread {}: starting".format(str(index))  )
     ThreadedMergeCsv(index,path,path_to_csv,lock)
     print("Thread {}: finishing".format(str(index))  )
     print("gloabal merge {} so far".format(str(glb_merge))  )
-
 def ThreadedMergeCsv_(index,path,path_csv,lock):
     count = 0
     with open(path, "r") as f:
@@ -113,8 +105,6 @@ def ThreadedMergeCsv_(index,path,path_csv,lock):
                     glb_merge+=count
                     print("\nThread{} ======Merging {}: lines ======= from {} ===== glb_merge => {}:".format(str(index), str(count),path,glb_merge))
                     count = 0
-
-
 def ThreadedMergeCsv(index,path,path_csv,lock):
     count = 0
     for line in pd.read_csv(path,chunksize=1):
@@ -131,7 +121,6 @@ def ThreadedMergeCsv(index,path,path_csv,lock):
                 glb_merge+=count
                 print("\nThread{} ======Merging {}: lines ======= from {} ===== glb_merge => {}:".format(str(index), str(count),path,glb_merge))
                 count = 0
-
 def ToCsvThread_function(name,index,path,path_to_csv,chunk_size):
     logging.info("Thread %s: starting", name + str(index))
     ThreadedDataSetToCsv(name,index,path,path_to_csv,chunk_size)
@@ -174,7 +163,6 @@ def file_to_lists_of_strings(ressource_path,data_file_name,chunck_size=1000):
                 line_index+=1
 
         return raws
-
 def from_image_directory_to_csv(src_path,path_csv,chunk_size):
     dataframes = [pd.DataFrame(columns=['emotion','pixels','usage']) for i in range(7)]
     print(len(dataframes))

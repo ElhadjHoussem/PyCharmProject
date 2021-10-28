@@ -13,7 +13,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.utils import to_categorical
 
-class NetworkSeq():
+class Network():
     def __init__(self,num_labels,width,height,input_shape):
         self.num_labels = num_labels
 
