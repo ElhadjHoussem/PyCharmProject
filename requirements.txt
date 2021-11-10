@@ -1,0 +1,5 @@
+conda create --name <env> python=3.7
+pip install mediapipe mtcnn
+conda install tensorflow-gpu=1.13.1 h5py=2.* cudnn=7.6.5 cudatoolkit=9.0 keras-gpu=2.3.1 pandas pillow scipy scikit-learn tk
+conda install -c conda-forge face_recognition tqdm
+conda install -c anaconda jupyter

@@ -6,19 +6,18 @@ from zipfile import ZipFile
 from PIL import Image,ImageOps
 import tqdm
 import glob
+import os
 
-#tf.enable_eager_execution()
 import tensorflow.contrib.eager as tfe
 ########################################################################################################################
 '''Global Variables'''
 ########################################################################################################################
 
-LABELS=['Neutral','Happy','Sad','Surprise','Fear','Disgust','Anger','Contempt','None','Uncertain','Non_Face']
+LABELS=['Neutral','Happy','Sad','Surprise','Fear','Disgust','Anger','Contempt']
 NUM_CLASSES = len(LABELS)
 
 ZIP_FILE_NAME = "J:/Emotion/AffectNet.zip"
-RECORD_RIR="AffectNetRecords_64x64_gray/"
-
+RECORD_RIR="../DataSet/AffectNet/AffectNetRecords_64x64_gray_2/"
 ANNOTATION_SUFFIX_KEYS=['aro','val','exp']
 ANNOTATION_TYPES={'aro':'float','val' :'float','exp':'int'}
 DATA_DICT_KEYS=['image','expression','arousal','valence']
@@ -75,38 +74,35 @@ def load_data_point_from_zipFile_by_chunks(file_name,data_dict_keys,annotation_S
         if len(Data_Points)>=chunck_size:
             yield Data_Points
             Data_Points=[]
-
-
 def count_annotation(file_name=ZIP_FILE_NAME):
     with ZipFile(file_name,'r') as zip_archive:
         files = zip_archive.namelist()
 
     return int(len(files)/5)
-
 ########################################################################################################################
 '''TF_RECORD HELPER Functions'''
 ########################################################################################################################
 def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
-    if isinstance(value, type(tf.constant(0))): # if value ist tensor
+    if isinstance(value, type(tf.constant(0))): # if value is tensor
         value = value.numpy() # get value of tensor
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
-
 def _float_feature(value):
   """Returns a floast_list from a float / double."""
   return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
-
 def _int64_feature(value):
   """Returns an int64_list from a bool / enum / int / uint."""
   return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
-
 def serialize_array(array):
   array = tf.io.serialize_tensor(array)
   return array
-
 ########################################################################################################################
 ''' TF_RECORD Feature Mapping Function'''
 ########################################################################################################################
+def ensure_dir(dir_path):
+    directory = os.path.dirname(dir_path)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
 '''while writing Record'''
 def parse_single_image(DataPoint):
@@ -114,8 +110,8 @@ def parse_single_image(DataPoint):
   #define the dictionary -- the structure -- of a single example
   data = {
       'raw_image': _bytes_feature(serialize_array(DataPoint['image'])),
-      'height': _int64_feature(DataPoint['image'].shape[0]),
-      'width': _int64_feature(DataPoint['image'].shape[1]),
+      'height': _int64_feature(int(DataPoint['image'].shape[0])),
+      'width': _int64_feature(int(DataPoint['image'].shape[1])),
       'expression': _int64_feature(int(DataPoint['expression'])),
       'arousal': _float_feature(float(DataPoint['arousal'])),
       'valence': _float_feature(float(DataPoint['valence']))
@@ -158,9 +154,10 @@ def parse_tfr_element(element):
 ########################################################################################################################
 
 '''writer function'''
-def write_images_to_tfr(tfrecord_filename:str="_AffectNet", chunk_size:int=10, out_dir:str=RECORD_RIR):
-
-    total_image = count_annotation(ZIP_FILE_NAME,ANNOTATION_SUFFIX_KEYS)
+def write_data_in_tfr_from_zip(zip_file_name=ZIP_FILE_NAME,tfrecord_filename:str="_AffectNet", chunk_size:int=10, out_dir:str=RECORD_RIR):
+    tf.enable_eager_execution()
+    ensure_dir(RECORD_RIR)
+    total_image = count_annotation(zip_file_name)
     #determine the number of shards (single TFRecord files) we need:
     splits = (total_image//chunk_size) + 1 #determine how many tfr shards are needed
     if total_image%chunk_size == 0:
@@ -168,7 +165,7 @@ def write_images_to_tfr(tfrecord_filename:str="_AffectNet", chunk_size:int=10, o
     print(f"\nUsing {splits} shard(s) for {total_image} files, with up to {chunk_size} samples per shard")
 
     file_count = 0
-    data_gen = load_data_point_from_zipFile(ZIP_FILE_NAME,DATA_DICT_KEYS,ANNOTATION_SUFFIX_KEYS,ANNOTATION_MAP,ANNOTATION_TYPES)
+    data_gen = load_data_point_from_zipFile(zip_file_name,DATA_DICT_KEYS,ANNOTATION_SUFFIX_KEYS,ANNOTATION_MAP,ANNOTATION_TYPES)
 
     for i in tqdm.tqdm(range(splits),desc="Global Progress All-Files "+" {} -> {}".format(file_count,total_image)):
         current_shard_name = "{}{}_{}{}.tfrecords".format(out_dir, i+1, splits, tfrecord_filename)
@@ -192,35 +189,36 @@ def write_images_to_tfr(tfrecord_filename:str="_AffectNet", chunk_size:int=10, o
     print(f"\nWrote {file_count} elements to TFRecord")
     return file_count
 '''Reader function'''
-def get_dataset(batch_size,data_size,tfr_dir:str=RECORD_RIR, pattern:str="*_AffectNet.tfrecords"):
+def get_dataset(batch_size,shuffle_buffer,data_size,tfr_dir:str=RECORD_RIR, pattern:str="*_AffectNet.tfrecords"):
+
+    AUTOTUNE = tf.data.experimental.AUTOTUNE
 
     train_size = int(0.7 * data_size)
     val_size = int(0.3 * data_size)
     file=tf.data.Dataset.list_files(tfr_dir+pattern)
 
     full_dataset = tf.data.TFRecordDataset(file)
-    full_dataset = full_dataset.shuffle(data_size)
-
 
 
     train_dataset = full_dataset.take(train_size)
+    train_dataset = train_dataset.cache()
+
     val_dataset = full_dataset.skip(val_size)
+    val_dataset = val_dataset.cache()
 
-    train_dataset = train_dataset.repeat()
-    val_dataset = val_dataset.repeat()
+    train_dataset = train_dataset.shuffle(batch_size*shuffle_buffer)
+    train_dataset = train_dataset.map(parse_tfr_element,num_parallel_calls=AUTOTUNE)
+    train_dataset = train_dataset.map(augment_data,num_parallel_calls=AUTOTUNE)
 
-    train_dataset = train_dataset.shuffle(batch_size*50)
-    val_dataset = val_dataset.shuffle(batch_size*10)
+    val_dataset = val_dataset.map(parse_tfr_element,num_parallel_calls=AUTOTUNE)
 
+    train_dataset = train_dataset.batch(batch_size).prefetch(AUTOTUNE).repeat()
+    val_dataset = val_dataset.batch(batch_size).prefetch(AUTOTUNE).repeat()
 
-    train_dataset = train_dataset.map(parse_tfr_element)
-    val_dataset = val_dataset.map(parse_tfr_element)
-
-    train_dataset = train_dataset.batch(batch_size)
-    val_dataset = val_dataset.batch(batch_size)
 
     return train_dataset,val_dataset
-def get_dataset_(batch_size,tfr_dir:str=RECORD_RIR, pattern:str="*_AffectNet.tfrecords"):
+
+def get_dataset_(batch_size,data_size,tfr_dir:str=RECORD_RIR, pattern:str="*_AffectNet.tfrecords"):
     file=tf.data.Dataset.list_files(tfr_dir+pattern)
     dataset = tf.data.TFRecordDataset(file)
     dataset = dataset.shuffle(batch_size*50)
@@ -230,10 +228,60 @@ def get_dataset_(batch_size,tfr_dir:str=RECORD_RIR, pattern:str="*_AffectNet.tfr
     return dataset
 
 ########################################################################################################################
+'''Data Generator for the Training'''
+########################################################################################################################
+def augment_data(*args):
+
+
+    args = list(args)
+    image=tf.expand_dims(args[0],-1)
+    image = tf.cond(tf.random.uniform((), 0, 1) > 0.80,
+                    lambda: image, lambda: tf.image.random_brightness(image,max_delta=0.1))
+    image = tf.cond(tf.random.uniform((), 0, 1) > 0.80,
+                    lambda: image, lambda: tf.image.random_contrast(image,lower=0.1,upper=0.2))
+    image = tf.cond(tf.random.uniform((), 0, 1) > 0.75,
+                    lambda: image, lambda: tf.image.random_flip_left_right(image))
+    image = tf.cond(tf.random.uniform((), 0, 1) > 0.75, lambda: image,
+                    lambda: tf.image.random_flip_up_down(image))
+    image = tf.cond(tf.random.uniform((), 0, 1) > 0.75, lambda: image,
+                    lambda: tf.image.rot90(image, tf.random_uniform(shape=[], minval=0, maxval=4, dtype=tf.int32)))
+
+    args[0]=tf.squeeze(image,-1)
+    return args
+
+def generate_data(batch_size,shuffle_buffer,data_size,tfr_dir:str=RECORD_RIR, pattern:str="*_AffectNet.tfrecords"):
+    Train_data,Val_data = get_dataset(batch_size,shuffle_buffer,data_size,tfr_dir, pattern)
+
+
+    train_iterator = Train_data.make_one_shot_iterator()
+    val_iterator = Val_data.make_one_shot_iterator()
+
+    train_images, train_labels,_,_ = train_iterator.get_next()
+    #train_images = map(augment_data,train_images)
+
+    val_images, val_labels,_,_ = val_iterator.get_next()
+
+    # set the pictures to the the proper dimentions
+    train_input = tf.reshape(train_images, [-1, IMAGE_SIZE,IMAGE_SIZE, 1])
+    val_input = tf.reshape(val_images, [-1, IMAGE_SIZE,IMAGE_SIZE, 1])
+
+    # Create a one hot array for the labels
+    train_labels = tf.one_hot(train_labels, NUM_CLASSES)
+    val_labels = tf.one_hot(val_labels, NUM_CLASSES)
+
+    return train_input,train_labels,val_input,val_labels
+
+########################################################################################################################
 '''Testing Tf_Recording '''
 ########################################################################################################################
 
-# #write_images_to_tfr(chunk_size=5000)
+#write_data_in_tfr_from_zip(chunk_size=1000)
 # image,expression = get_dataset(128)
-# for data in get_dataset(128):
-#   print(data.shape)
+# count_data=287651 # count_annotation()
+# shuffle_buffer =10
+# batch_size = 128
+# epochs = 10
+# width, height = 64, 64
+# NUM_CLASSES = len(LABELS)
+#
+

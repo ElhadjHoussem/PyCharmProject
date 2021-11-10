@@ -67,23 +67,6 @@ class Data_augmentation:
         cv2.imwrite(save_path+'/_rot_90__'+self.name, img_rot_90_)
         cv2.imwrite(save_path+'/_rot_45__'+self.name, img_rot_45_)
         cv2.imwrite(save_path+'/GaussianNoise_'+self.name, img_gaussian)
-    def DataSetAugmentation(self,file_dir,output_path):
-        dir_name_sub_root=""
-        for root, dirs, files in os.walk(file_dir):
-
-            test_or_train=["test","train"]
-            for i,t in enumerate(test_or_train):
-                if root.find(t)!= -1 :
-                    dir_name_sub_root=test_or_train[i]
-
-            if len(dirs) == 0:
-                dir_name = dir_name_sub_root + "/"+root[-1]
-
-
-
-            for file in files:
-                raw_image = Data_augmentation(root,file)
-                raw_image.image_augment(output_path+"/"+dir_name+"/")
     def noise(self,noise_typ,image):
         if noise_typ == "gauss":
             row,col,ch= image.shape
@@ -121,6 +104,24 @@ class Data_augmentation:
             gauss = gauss.reshape(row,col,ch)
             noisy = image + image * gauss
             return noisy
+
+    def DataSetAugmentation(self,file_dir,output_path):
+        dir_name_sub_root=""
+        for root, dirs, files in os.walk(file_dir):
+
+            test_or_train=["test","train"]
+            for i,t in enumerate(test_or_train):
+                if root.find(t)!= -1 :
+                    dir_name_sub_root=test_or_train[i]
+
+            if len(dirs) == 0:
+                dir_name = dir_name_sub_root + "/"+root[-1]
+
+
+
+            for file in files:
+                raw_image = Data_augmentation(root,file)
+                raw_image.image_augment(output_path+"/"+dir_name+"/")
 
 if __name__ == "__main__":
     path_in = "../Ressources/data/Fer2013Unfolded"
